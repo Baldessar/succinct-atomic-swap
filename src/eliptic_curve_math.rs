@@ -149,3 +149,22 @@ pub fn pre_sign(message: &Vec<u8>, nonce: &BigInt, statement_t: &Point, prv_key:
 
     return (r, s_line, pub_key, r_kT, r_line_kG)
 }
+
+pub fn pre_verify(message: &Vec<u8>, s_line: &BigInt, r: &BigInt, r_line_kG: Point, pub_key: &PublicKey) -> bool {
+    let generator = Point { x: GENERATOR_X.to_vec(), y: GENERATOR_Y.to_vec() };
+    let q: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &CURVE_ORDER);
+
+    let xG: Point = get_y_from_x(&pub_key.to_string());
+
+    let message_hash: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus,sha256::Hash::hash(message).as_byte_array()).rem_euclid(&q);
+    
+    let u: BigInt = (message_hash*&s_line.modinv(&q).unwrap()).rem_euclid(&q);
+    let v: BigInt = (r*&s_line.modinv(&q).unwrap()).rem_euclid(&q);
+
+    let uG = multiply(&generator, &u);
+    let vX = multiply(&xG, &v);
+
+    let verification_point: Point = add(&uG, &vX);
+
+    return &r_line_kG.x == &verification_point.x && &r_line_kG.y == &verification_point.y;
+}
