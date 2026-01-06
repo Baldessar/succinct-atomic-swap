@@ -119,3 +119,33 @@ pub fn get_y_from_x(x_hex: &str) -> Point {
 
     return Point { x: x.to_bytes_be().1, y: y.to_bytes_be().1};
 }
+
+pub fn pre_sign(message: &Vec<u8>, nonce: &BigInt, statement_t: &Point, prv_key: &SecretKey, secret_t: &BigInt) -> (BigInt, BigInt, PublicKey, Point, Point){
+    let secp: Secp256k1<secp256k1::All> = Secp256k1::new();
+
+    let generator = Point { x: GENERATOR_X.to_vec(), y: GENERATOR_Y.to_vec() };
+    let q: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &CURVE_ORDER);
+    let pub_key = prv_key.public_key(&secp);
+
+
+    // let tG = multiply(&generator, &secret_t);
+    let x_secret = BigInt::from_bytes_be(num_bigint::Sign::Plus, &prv_key.secret_bytes());
+
+
+    // let (sign2, bytes2) =  rng().gen_bigint(256).to_bytes_be();
+    // let nonce_k = BigInt::from_bytes_be(num_bigint::Sign::Plus, &bytes2).rem_euclid(&q);
+
+    let r_line_kG = multiply(&generator, &nonce);
+    let r_kT = multiply(statement_t, &nonce);
+
+    let r: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &r_kT.x);
+
+
+    let z: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus,sha256::Hash::hash(message).as_byte_array()).rem_euclid(&q);
+
+
+    // let s_line = (&z + (&r*&x_secret)).modinv(&nonce).unwrap();
+    let s_line: BigInt = (nonce.modinv(&q).unwrap()*(&z + &r*x_secret)).rem_euclid(&q);
+
+    return (r, s_line, pub_key, r_kT, r_line_kG)
+}
