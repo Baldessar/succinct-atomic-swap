@@ -73,3 +73,28 @@ pub fn encode_inputs(outpoint_list: &Vec<&str>) -> Vec<u8> {
     
     return inputs;
 }
+
+pub fn encode_outputs(outputs_list: Vec<(Vec<u8>, u64)>) -> Vec<u8> {
+
+    let mut outputs: Vec<u8> = vec![];
+    let mut output_count: Vec<u8> = encode_compact_size(outputs_list.len());
+    outputs.append(&mut output_count);
+
+    for output in outputs_list {
+        let mut current_output: Vec<u8> = vec![];
+        let  (mut script_pub_key, amount) = output;
+
+
+        let mut amount_in_bytes: Vec<u8> = amount.to_le_bytes().to_vec();
+        let mut script_pub_key_lenght: Vec<u8> = encode_compact_size(script_pub_key.len());
+
+        current_output.append(&mut amount_in_bytes);
+        current_output.append(&mut script_pub_key_lenght);
+        current_output.append(&mut script_pub_key);
+
+        outputs.append(&mut current_output);
+    }
+
+    return outputs;
+}
+
