@@ -95,3 +95,27 @@ pub fn multiply(point: &Point, scalar: &BigInt) -> Point {
 }   
 
 
+pub fn get_y_from_x(x_hex: &str) -> Point {
+
+    let prefix = &x_hex[..2];
+    let x = BigInt::from_bytes_be(num_bigint::Sign::Plus, &hex::decode(&x_hex[2..]).unwrap());
+
+
+    let p: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &FIELD_SIZE);
+
+
+    let y_sq = ((x.pow(3)) + BigInt::from(7)).rem_euclid(&p);
+
+    let mut y = y_sq.modpow(&((&p+BigInt::from(1))/BigInt::from(4)), &p);
+
+
+    if "02" == prefix && y.rem_euclid(&BigInt::from(2)) != BigInt::zero() {
+        y = (&p - y).rem_euclid(&p)
+    }
+
+    if "03" == prefix && y.rem_euclid(&BigInt::from(2)) == BigInt::zero() {
+        y = (&p - y).rem_euclid(&p)
+    }
+
+    return Point { x: x.to_bytes_be().1, y: y.to_bytes_be().1};
+}
