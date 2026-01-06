@@ -98,3 +98,34 @@ pub fn encode_outputs(outputs_list: Vec<(Vec<u8>, u64)>) -> Vec<u8> {
     return outputs;
 }
 
+
+pub fn build_script_pub_key_p2wpkh(pub_key: &bitcoin::PublicKey) -> Vec<u8> {
+
+    println!("{:?}", pub_key.to_bytes());
+
+
+    let bytes = match hex::decode("cafe") {
+        Ok(value) => value,
+        Err(e) => return vec![],
+    };
+
+    let mut hasher_256: sha256::HashEngine = sha256::HashEngine::default();
+    hasher_256.input(&bytes.to_vec());
+
+    let hash256: Vec<u8> = sha256::Hash::from_engine(hasher_256).as_byte_array().to_vec();
+
+    let mut hasher_160: ripemd160::HashEngine = ripemd160::HashEngine::default();
+    hasher_160.input(&hash256);
+
+    let hash160 = ripemd160::Hash::from_engine(hasher_160).as_byte_array().to_vec();
+
+    let pb: PushBytesBuf = PushBytesBuf::try_from(hash160)
+    .expect("data must be ≤ 520 bytes");
+
+    let script: Vec<u8> = Builder::new()
+                            .push_opcode(opcodes::OP_0)
+                            .push_slice(pb).as_bytes().to_vec();
+
+    return script;
+
+}
