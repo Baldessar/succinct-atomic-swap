@@ -43,3 +43,33 @@ pub fn encode_compact_size(size: usize) -> Vec<u8> {
     return compact_leading;
 }
 
+pub fn encode_inputs(outpoint_list: &Vec<&str>) -> Vec<u8> {
+
+    let input_count: usize = outpoint_list.len();
+    let mut compact_input_count: Vec<u8> = encode_compact_size(input_count);
+    let script_key_size: [u8; 1] = [0];
+    let sequence: [u8; 4] = [255, 255, 255, 255];
+    
+    let mut inputs: Vec<u8> = vec![];
+
+    inputs.append(&mut compact_input_count);
+
+
+    for outpoint in outpoint_list {
+        let current_outpoint: Vec<&str> = outpoint.split(":").collect();
+        
+        let mut hex_bytes: Vec<u8> = hex::decode(current_outpoint[0]).expect("invalid hex string: failed to decode");
+
+        let mut vout_bytes:Vec<u8>  = (current_outpoint[1].parse::<u32>().expect("invalid string: failed to converse to number")).to_le_bytes().to_vec();
+
+        let mut bytes_outpoint: Vec<u8> = vec![];
+        bytes_outpoint.append(&mut hex_bytes);
+        bytes_outpoint.append(&mut vout_bytes);
+        bytes_outpoint.extend(script_key_size);
+        bytes_outpoint.extend(sequence);
+        
+        inputs.append(&mut bytes_outpoint);
+    }
+    
+    return inputs;
+}
