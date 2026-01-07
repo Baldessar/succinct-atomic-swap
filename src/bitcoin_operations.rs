@@ -158,3 +158,34 @@ pub fn build_script_pub_key_p2wsh(script: &str) -> Vec<u8> {
 
 }
 
+
+pub fn build_2_of_2_ms_script(sender_pub_key: &bitcoin::PublicKey, receiver_pub_key: &bitcoin::PublicKey) -> Vec<u8> {
+    let mut ms_script: Vec<u8> = Builder::new()
+                .push_opcode(opcodes::all::OP_PUSHNUM_2)
+                .push_key(sender_pub_key)
+                .push_key(receiver_pub_key)
+                .push_opcode(opcodes::all::OP_PUSHNUM_2)
+                .push_opcode(opcodes::all::OP_CHECKMULTISIG)
+                .into_bytes();
+    
+    return ms_script;
+}
+
+
+pub fn build_p2wsh_script_pub_key(script: Vec<u8>) -> Vec<u8> {
+
+    let mut hasher_256: sha256::HashEngine = sha256::HashEngine::default();
+
+    hasher_256.input(&script);
+
+    let script_hash: PushBytesBuf = PushBytesBuf::try_from(sha256::Hash::from_engine(hasher_256).as_byte_array().to_vec())
+    .expect("data must be ≤ 520 bytes");
+
+    let mut ms_script = Builder::new()
+                    .push_opcode(opcodes::OP_0)
+                    .push_slice(script_hash)
+                    .into_bytes();
+                    
+    
+    return ms_script;
+}
