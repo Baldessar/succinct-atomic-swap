@@ -1,12 +1,11 @@
 
 use std::vec;
 
-use num_bigint_dig::ModInverse;
-use bitcoin::secp256k1::{Scalar, constants::{CURVE_ORDER, FIELD_SIZE, GENERATOR_X, GENERATOR_Y}};
+use bitcoin::secp256k1::{constants::{CURVE_ORDER, FIELD_SIZE, GENERATOR_X, GENERATOR_Y}};
 use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
 use bitcoin::secp256k1::hashes::{sha256, Hash};
 use bitcoin::secp256k1;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, RandBigInt, ToBigInt};
 use num_traits::{Euclid, Zero};
 
 #[derive(Clone)]
@@ -15,6 +14,14 @@ use num_traits::{Euclid, Zero};
 pub struct Point {
     pub x: Vec<u8>,
     pub y: Vec<u8>
+}
+
+#[derive(Clone)]
+#[derive(PartialEq)]
+#[derive(Debug)]
+pub struct Signature {
+    pub r: Vec<u8>,
+    pub s: Vec<u8>
 }
 
 
@@ -167,4 +174,30 @@ pub fn pre_verify(message: &Vec<u8>, s_line: &BigInt, r: &BigInt, r_line_kG: Poi
     let verification_point: Point = add(&uG, &vX);
 
     return &r_line_kG.x == &verification_point.x && &r_line_kG.y == &verification_point.y;
+}
+
+
+pub fn sign(private_key: &bitcoin::PrivateKey, message: &Vec<u8>, is_test: bool) -> Signature {
+// pub fn sign( is_test: bool) {
+    let generator: Point = Point { x: GENERATOR_X.to_vec(), y: GENERATOR_Y.to_vec() };
+    let mut rng = rand::thread_rng();
+
+    let curve_order: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &CURVE_ORDER);
+
+    let mut actual_nonce: BigInt = 1.to_bigint().expect("");
+    
+    if !is_test {
+        actual_nonce = rng.gen_bigint_range(&0.to_bigint().expect(""),&BigInt::from_bytes_be(num_bigint::Sign::Plus,&CURVE_ORDER))
+
+    }
+
+    let r: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &multiply(&generator, &actual_nonce).x).rem_euclid(&BigInt::from_bytes_be(num_bigint::Sign::Plus,&CURVE_ORDER));
+
+    let s = ((actual_nonce.modinv(&curve_order)).expect("msg") * (BigInt::from_bytes_be(num_bigint::Sign::Plus, &message) + BigInt::from_bytes_be(num_bigint::Sign::Plus, &private_key.to_bytes()) * &r)).rem_euclid(&curve_order);
+
+
+    println!("r: {}", r);
+    println!("s: {}", s);
+
+    return Signature {r: r.to_bytes_be().1.to_vec(), s: s.to_bytes_be().1.to_vec()}
 }
