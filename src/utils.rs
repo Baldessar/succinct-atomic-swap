@@ -1,4 +1,6 @@
 use num_traits::{ToPrimitive};
+use bitcoin::secp256k1::hashes::{sha256, Hash};
+use bitcoin::hashes::HashEngine;
 
 pub fn der_encoding(r: Vec<u8>, s: Vec<u8>) -> Vec<u8>{
 
@@ -41,4 +43,13 @@ pub fn der_encoding(r: Vec<u8>, s: Vec<u8>) -> Vec<u8>{
     der_signature.extend(bytes_s);
 
     return der_signature;
+}
+
+pub fn dsha256(message: &Vec<u8>) -> Vec<u8>{
+    let mut hasher_256: sha256::HashEngine = sha256::HashEngine::default();
+    hasher_256.input(&message);
+    
+    let hash256: Vec<u8> = sha256::Hash::from_engine(hasher_256).hash_again().as_byte_array().to_vec();
+
+    return hash256;
 }
