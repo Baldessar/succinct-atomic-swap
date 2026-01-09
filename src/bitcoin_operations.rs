@@ -14,6 +14,8 @@ use bitcoin::hashes::HashEngine;
 use bitcoin::hashes::Hash;
 use crate::eliptic_curve_math;
 use crate::utils::{self, der_encoding};
+use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
+use bitcoin::{secp256k1};
 
 #[derive(Debug)]
 pub enum BalanceError {
@@ -203,5 +205,36 @@ pub fn sign(private_key:&PrivateKey, message: &Vec<u8>) -> Vec<u8> {
     result_signature.extend(&encoded_signature);
 
     return result_signature;
+}
+
+
+pub fn build_p2wsh_witness(prv_keys: Vec<&PrivateKey>, message: &Vec<u8>, script: &Vec<u8>) -> Vec<u8> {
+    
+    let secp: Secp256k1<secp256k1::All>  = Secp256k1::gen_new();
+    let mut signatures: Vec<u8> = vec![];
+    let mut pub_keys: Vec<u8> = vec![];
+
+    for prv_key in prv_keys {
+        let mut signature: Vec<u8> = sign(prv_key, &message);
+        let mut sig_size: Vec<u8> = encode_compact_size(signature.len());
+        signatures.append(&mut sig_size);
+        signatures.append(&mut signature);
+        pub_keys.append(&mut prv_key.public_key(&secp).to_bytes().to_vec());
+
+    }
+
+    let mut stack_size: Vec<u8> = vec![4];
+    let mut script_size: Vec<u8> = encode_compact_size(script.len());
+
+    let mut witness: Vec<u8> = vec![];
+
+    witness.append(&mut stack_size);
+    witness.append(&mut hex::decode(&"00").unwrap());
+    witness.append(&mut signatures);
+    witness.append(&mut script_size);
+    witness.append(&mut script.clone());
+
+    return witness;
+
 }
 
