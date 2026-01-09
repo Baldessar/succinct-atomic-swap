@@ -2,6 +2,7 @@
 use std::{path::PathBuf, process::Command};
 
 
+use bitcoin::{PrivateKey};
 use bitcoin::script::{self, PushBytes, PushBytesBuf};
 use bitcoin::{opcodes, script::Builder};
 use num_bigint::BigInt;
@@ -11,6 +12,8 @@ use bitcoin::hashes::sha256;
 use bitcoin::hashes::ripemd160;
 use bitcoin::hashes::HashEngine;
 use bitcoin::hashes::Hash;
+use crate::eliptic_curve_math;
+use crate::utils::{self, der_encoding};
 
 #[derive(Debug)]
 pub enum BalanceError {
@@ -189,3 +192,16 @@ pub fn build_p2wsh_script_pub_key(script: Vec<u8>) -> Vec<u8> {
     
     return ms_script;
 }
+
+
+pub fn sign(private_key:&PrivateKey, message: &Vec<u8>) -> Vec<u8> {
+    let signature: eliptic_curve_math::Signature = eliptic_curve_math::sign(private_key, message, false);
+    let signature_hash_type: Vec<u8> = hex::decode("01").unwrap();
+    let mut encoded_signature: Vec<u8> = der_encoding(signature.r, signature.s);
+
+    let mut result_signature: Vec<u8> = signature_hash_type;
+    result_signature.extend(&encoded_signature);
+
+    return result_signature;
+}
+
