@@ -1,8 +1,13 @@
 #![allow(unused)]
+// use core::hash;
+// use std::io::repeat;
+// use std::{i64, vec};
 use std::{path::PathBuf, process::Command};
 
 
 use bitcoin::{PrivateKey};
+// use bitcoin::ecdsa::Signature;
+// use bitcoin::p2p::message;
 use bitcoin::script::{self, PushBytes, PushBytesBuf};
 use bitcoin::{opcodes, script::Builder};
 use num_bigint::BigInt;
@@ -13,9 +18,14 @@ use bitcoin::hashes::ripemd160;
 use bitcoin::hashes::HashEngine;
 use bitcoin::hashes::Hash;
 use crate::eliptic_curve_math;
-use crate::utils::{self, der_encoding};
+use crate::utils::{self, der_encoding, dsha256};
+
+
+// use bitcoin::secp256k1::constants::{CURVE_ORDER, FIELD_SIZE, GENERATOR_X, GENERATOR_Y};
 use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
 use bitcoin::{secp256k1};
+// use eliptic_curve_math::{Point, multiply, add, get_y_from_x};
+// use num_traits::{Euclid};
 
 #[derive(Debug)]
 pub enum BalanceError {
@@ -48,7 +58,7 @@ pub fn encode_compact_size(size: usize) -> Vec<u8> {
     return compact_leading;
 }
 
-pub fn encode_inputs(outpoint_list: &Vec<&str>) -> Vec<u8> {
+pub fn encode_inputs(outpoint_list: &Vec<Vec<u8>>) -> Vec<u8> {
 
     let input_count: usize = outpoint_list.len();
     let mut compact_input_count: Vec<u8> = encode_compact_size(input_count);
@@ -61,15 +71,10 @@ pub fn encode_inputs(outpoint_list: &Vec<&str>) -> Vec<u8> {
 
 
     for outpoint in outpoint_list {
-        let current_outpoint: Vec<&str> = outpoint.split(":").collect();
-        
-        let mut hex_bytes: Vec<u8> = hex::decode(current_outpoint[0]).expect("invalid hex string: failed to decode");
-
-        let mut vout_bytes:Vec<u8>  = (current_outpoint[1].parse::<u32>().expect("invalid string: failed to converse to number")).to_le_bytes().to_vec();
+        let mut current_outpoint:Vec<u8> = outpoint.clone();
 
         let mut bytes_outpoint: Vec<u8> = vec![];
-        bytes_outpoint.append(&mut hex_bytes);
-        bytes_outpoint.append(&mut vout_bytes);
+        bytes_outpoint.append(&mut current_outpoint);
         bytes_outpoint.extend(script_key_size);
         bytes_outpoint.extend(sequence);
         
@@ -109,10 +114,7 @@ pub fn build_script_pub_key_p2wpkh(pub_key: &bitcoin::PublicKey) -> Vec<u8> {
     println!("{:?}", pub_key.to_bytes());
 
 
-    let bytes = match hex::decode("cafe") {
-        Ok(value) => value,
-        Err(e) => return vec![],
-    };
+    let bytes = pub_key.to_bytes();
 
     let mut hasher_256: sha256::HashEngine = sha256::HashEngine::default();
     hasher_256.input(&bytes.to_vec());
@@ -177,7 +179,7 @@ pub fn build_2_of_2_ms_script(sender_pub_key: &bitcoin::PublicKey, receiver_pub_
 }
 
 
-pub fn build_p2wsh_script_pub_key(script: Vec<u8>) -> Vec<u8> {
+pub fn build_p2wsh_script_pub_key(script: &Vec<u8>) -> Vec<u8> {
 
     let mut hasher_256: sha256::HashEngine = sha256::HashEngine::default();
 
@@ -238,3 +240,73 @@ pub fn build_p2wsh_witness(prv_keys: Vec<&PrivateKey>, message: &Vec<u8>, script
 
 }
 
+
+pub fn get_commitment_hash(outpoints: &Vec<Vec<u8>>, scriptcodes: &Vec<Vec<u8>>, values: &Vec<Vec<u8>>, outputs: &Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+
+    let mut commitment_hashes: Vec<Vec<u8>> = vec![];
+    let outpoints_len: usize =  outpoints.len();
+    let scriptcodes_len: usize =  scriptcodes.len();
+    let values_len: usize =  values.len();
+    let outputs_len: usize =  outputs.len();
+
+    let version: Vec<u8> = hex::decode(&"02000000").unwrap();
+    let n_lock_time: Vec<u8> = hex::decode(&"00000000").unwrap();
+    let n_hash_type: Vec<u8> = hex::decode(&"01000000").unwrap();
+
+    let hash_prev_out: Vec<u8> = utils::dsha256(&outpoints.clone().concat());
+    
+    let sequence: Vec<u8> = hex::decode(&"ffffffff".repeat(outpoints_len)).unwrap();
+    let hashed_sequence = utils::dsha256(&sequence);
+    let hashed_outputs = utils::dsha256(&outputs.clone().concat());
+
+    let mut i: usize = 0;
+
+    while i < outpoints_len {
+        let mut current_outpoint = outpoints[i].clone();
+        let mut current_scriptcode = scriptcodes[i].clone();
+        let mut current_value = values[i].clone();
+        let mut nsequence = hex::decode(&"ffffffff").unwrap();
+
+        let mut preimage: Vec<u8> = vec![];
+
+        preimage.extend( &version);
+        preimage.extend( &hash_prev_out);
+        preimage.extend( &hashed_sequence);
+        preimage.append(&mut current_outpoint);
+        preimage.append(&mut current_scriptcode);
+        preimage.append(&mut current_value);
+        preimage.append(&mut nsequence);
+        preimage.extend( &hashed_outputs);
+        preimage.extend( &n_lock_time);
+        preimage.extend( &n_hash_type);
+
+       
+        let preimage_hash = dsha256(&preimage);
+
+        commitment_hashes.push(preimage_hash);
+
+    }
+
+
+    return commitment_hashes;
+
+}
+
+
+
+
+
+// fn bcli(cmd: &str) -> Result<Vec<u8>, BalanceError> {
+//     let args: Vec<&str> = cmd.split(' ').collect::<Vec<&str>>();
+
+//     let result: std::process::Output = Command::new("bitcoin-cli")
+//         .args(&args)
+//         .output()
+//         .map_err(|_| BalanceError::MissingCodeCantRun)?;
+
+//     if result.status.success() {
+//         return Ok(result.stdout);
+//     } else {
+//         return Ok(result.stderr);
+//     }
+// }

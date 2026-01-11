@@ -188,16 +188,11 @@ pub fn sign(private_key: &bitcoin::PrivateKey, message: &Vec<u8>, is_test: bool)
     
     if !is_test {
         actual_nonce = rng.gen_bigint_range(&0.to_bigint().expect(""),&BigInt::from_bytes_be(num_bigint::Sign::Plus,&CURVE_ORDER))
-
     }
 
     let r: BigInt = BigInt::from_bytes_be(num_bigint::Sign::Plus, &multiply(&generator, &actual_nonce).x).rem_euclid(&BigInt::from_bytes_be(num_bigint::Sign::Plus,&CURVE_ORDER));
 
     let s = ((actual_nonce.modinv(&curve_order)).expect("msg") * (BigInt::from_bytes_be(num_bigint::Sign::Plus, &message) + BigInt::from_bytes_be(num_bigint::Sign::Plus, &private_key.to_bytes()) * &r)).rem_euclid(&curve_order);
-
-
-    println!("r: {}", r);
-    println!("s: {}", s);
 
     return Signature {r: r.to_bytes_be().1.to_vec(), s: s.to_bytes_be().1.to_vec()}
 }
