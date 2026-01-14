@@ -90,6 +90,37 @@ pub fn build_on_chain_transaction_btc(
     return (tx.compute_txid().to_string(), bitcoin::consensus::encode::serialize_hex(&tx));
 
 }
+
+pub fn build_success_transaction(prev_txid: &str, amount: u64, fee: u64, bob_pub_key: &bitcoin::PublicKey) -> (String, String){
+    let previous_txid = prev_txid.parse::<Txid>().unwrap();
+    let previous_vout: u32 = 0;
+    let input = TxIn {
+        previous_output: OutPoint {
+            txid: previous_txid,
+            vout: previous_vout,
+        },
+        script_sig: ScriptBuf::new(), // Empty for SegWit
+        sequence: Sequence::MAX,
+        witness: Witness::new(), // Will fill this later
+    };
+
+
+    let recipient_address = Address::p2wpkh(&CompressedPublicKey::try_from(bob_pub_key.clone()).unwrap(), Network::Bitcoin);
+    let output = TxOut {
+        value: Amount::from_sat(amount - fee), // amount in satoshis
+        script_pubkey: recipient_address.script_pubkey(),
+    };
+
+    let tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: vec![input],
+        output: vec![output],
+    };
+
+
+    return (tx.compute_txid().to_string(), bitcoin::consensus::encode::serialize_hex(&tx));
+
 }
 
 pub fn build_refund_transaction_1() { // Script do it later
