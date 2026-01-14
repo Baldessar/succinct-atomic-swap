@@ -1,24 +1,95 @@
+use std::str::FromStr;
+use bitcoin::{Amount, CompressedPublicKey};
+use bitcoincore_rpc::json::{ListUnspentResultEntry};
 
-use core::slice;
+use bitcoin::{
+    absolute::LockTime,
+    transaction::Version,
+    Address,
+    Network,
+    OutPoint,
+    ScriptBuf,
+    Sequence,
+    Transaction,
+    Txid,
+    TxIn,
+    TxOut,
+    Witness,
+    absolute,
+    amount,
+    opcodes::all::*,
+    script::Builder,
+    transaction,
+};
 
-use num_bigint::{BigInt};
-use bitcoin::secp256k1::constants::{CURVE_ORDER, FIELD_SIZE, GENERATOR_X, GENERATOR_Y};
-use bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
-use eliptic_curve_math::{Point, multiply, add, get_y_from_x};
-use num_traits::{Euclid};
-use bitcoin::secp256k1::hashes::{sha256, Hash};
-use bitcoin::secp256k1;
-use crate::bitcoin_operations::{encode_inputs, encode_outputs, build_script_pub_key_p2wpkh};
-use crate::{eliptic_curve_math, succinct_atomic_swap};
 
 
+pub fn build_on_chain_transaction_btc(
+    alice_pub_key: &bitcoin::PublicKey,
+    bob_pub_key: &bitcoin::PublicKey,
+    change_pub_key: &bitcoin::PublicKey,
+    utxos: &Vec<&ListUnspentResultEntry>,
+    sats_amount: u64,
+    fee: u64,
+) -> (String, String) {
 
-pub fn build_on_chain_transaction_btc(sender_pub_key: &bitcoin::PublicKey, receiver_pub_key: &bitcoin::PublicKey, inputs: &Vec<&str>, outputs:Vec<(Vec<u8>, u64)>) {
+    let multisig_script = Builder::new()
+        .push_opcode(OP_PUSHNUM_2)  // Require 2 signatures
+        .push_key(&alice_pub_key)
+        .push_key(&bob_pub_key)
+        .push_opcode(OP_PUSHNUM_2)  // Out of 2 keys
+        .push_opcode(OP_CHECKMULTISIG)
+        .into_script();
+
+        // Create P2WSH address from the multisig script
+    let p2wsh_address = Address::p2wsh(&multisig_script, Network::Signet);
+    let p2wpkh_change_address = Address::p2wpkh(&CompressedPublicKey::from_str(&change_pub_key.to_string().as_str()).unwrap(), Network::Signet);
+
+    let mut inputs: Vec<TxIn> = vec![];
+
+    let mut available_amount: u64 = 0;
+
+    for utxo in utxos {
+        let input = TxIn {
+            previous_output: OutPoint {
+                txid: utxo.txid,
+                vout: utxo.vout,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: Witness::default(),
+        };
+
+        available_amount += utxo.amount.to_sat();
+
+        inputs.push(input);
+    }
+
+    available_amount -= fee;
+    available_amount -= sats_amount;
+    // Create the transaction
+
+    let output = TxOut {
+        value: amount::Amount::from_sat(sats_amount), // Subtract fee (adjust as needed)
+        script_pubkey: p2wsh_address.script_pubkey(),
+    };
+
+    let change_output = TxOut {
+        value: amount::Amount::from_sat(available_amount), // Subtract fee (adjust as needed)
+        script_pubkey: p2wpkh_change_address.script_pubkey(),
+    };
+
+    let tx = Transaction {
+        version: transaction::Version::TWO,
+        lock_time: absolute::LockTime::ZERO,
+        input: inputs,
+        output: vec![output, change_output],
+    };
+
+    
+    return (tx.compute_txid().to_string(), bitcoin::consensus::encode::serialize_hex(&tx));
 
 }
-
-pub fn build_success_transaction() {
-
 }
 
 pub fn build_refund_transaction_1() { // Script do it later
